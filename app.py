@@ -36,11 +36,10 @@ try:
             limit_date = now - timedelta(days=90)
             df = df[df['created_at_dt'] >= limit_date]
             
-        # 1번부터 시작하는 '순서' 컬럼 만들기
+        # 순서 컬럼 생성 및 정리
         df = df.reset_index(drop=True)
-        df['순서'] = df.index + 1
+        df['No.'] = df.index + 1
         
-        # 텍스트 세정 (HTML 태그 제거)
         def clean_text(text):
             if not text: return text
             text = re.sub(r'<[^>]*>', '', text)
@@ -48,13 +47,13 @@ try:
         df['title'] = df['title'].apply(clean_text)
 
         # ---------------------------------------------------------
-        # 🗺️ 지도 시각화 (1. 말풍선에서 기업 제외)
+        # 🗺️ 지도 시각화 (말풍선 배경색을 밝게 변경)
         # ---------------------------------------------------------
         map_data = df.dropna(subset=['lat', 'lon'])
         if not map_data.empty:
             st.subheader(f"🗺️ 글로벌 프로젝트 지도 ({len(map_data)}건)")
+            st.caption("🔴 500MW 이상 | 🟠 100MW 이상 | 🟢 100MW 미만/미상")
             
-            # MW 수치 정제 및 색상 지정
             def parse_mw(val):
                 nums = re.findall(r'\d+', str(val))
                 return float(nums[0]) if nums else 0
@@ -68,27 +67,37 @@ try:
                 initial_view_state=view_state,
                 layers=[layer],
                 tooltip={
-                    "html": "<b>{project_name}</b><br/>📍 위치: {location}<br/>⚡ 용량: {power_capacity_mw} MW",
-                    "style": {"backgroundColor": "#1E1E1E", "color": "white"}
+                    "html": """
+                    <div style="font-family: sans-serif; padding: 10px;">
+                        <b style="font-size: 14px;">{project_name}</b><br/>
+                        <hr style="margin: 5px 0; border: 0.5px solid #ccc;">
+                        📍 <b>위치:</b> {location}<br/>
+                        ⚡ <b>용량:</b> {power_capacity_mw} MW
+                    </div>
+                    """,
+                    "style": {
+                        "backgroundColor": "#FFFFFF",  # 밝은 흰색 배경으로 변경
+                        "color": "#000000",           # 글자색은 검은색
+                        "border": "1px solid #777",
+                        "zIndex": "10000"
+                    }
                 }
             ))
 
         st.divider()
         st.metric("조회된 프로젝트", f"{len(df)}건 ({period})")
 
-        # --- 목록 보기 방식 ---
         view_mode = st.sidebar.radio("목록 보기 방식", ["표 (PC)", "리스트 (모바일)"])
 
         if view_mode == "표 (PC)":
-            # 2. 에러 해결: horizontal_alignment 제거 및 hide_index 적용
-            # hide_index=True를 쓰면 0부터 시작하는 왼쪽 번호가 사라집니다.
+            # 불필요한 인덱스 숨기기 및 표 출력
             st.dataframe(
-                df[['순서', 'title', 'url', 'project_name', 'location', 'power_capacity_mw', 'energy_tech', 'display_date']],
+                df[['No.', 'title', 'url', 'project_name', 'location', 'power_capacity_mw', 'energy_tech', 'display_date']],
                 use_container_width=True,
                 height='content',
-                hide_index=True, # 0번 인덱스 숨기기
+                hide_index=True,
                 column_config={
-                    "순서": st.column_config.Column("No.", width="small"),
+                    "No.": st.column_config.Column("No.", width="small"),
                     "url": st.column_config.LinkColumn("기사", display_text="🔗 이동"),
                     "title": st.column_config.Column("뉴스 제목", width="large"),
                     "display_date": "수집일"
@@ -97,7 +106,7 @@ try:
         else:
             for index, row in df.iterrows():
                 with st.container():
-                    st.markdown(f"### {row['순서']}. [{row['title']}]({row['url']})")
+                    st.markdown(f"### {row['No.']}. [{row['title']}]({row['url']})")
                     c1, c2, c3 = st.columns(3)
                     c1.caption("📍 위치")
                     c1.write(row['location'] if row['location'] else "-")
