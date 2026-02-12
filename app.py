@@ -3,9 +3,11 @@ from supabase import create_client, Client
 import pandas as pd
 import re
 import html
+import pydeck as pdk  # 지도를 그리기 위한 도구
 
 st.set_page_config(page_title="에너지 모니터링", layout="wide")
 
+# Supabase 연결
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
@@ -19,7 +21,7 @@ try:
         df = pd.DataFrame(response.data)
         df.index = range(1, len(df) + 1)
         
-        # 텍스트 정리 함수
+        # 텍스트 정리
         def clean_text(text):
             if not text: return text
             text = re.sub(r'<[^>]*>', '', text)
@@ -28,21 +30,53 @@ try:
         df['title'] = df['title'].apply(clean_text)
 
         # ---------------------------------------------------------
-        # 🗺️ [지도 시각화 기능 추가]
-        # 위도(lat), 경도(lon) 데이터가 있는 프로젝트만 골라냅니다.
+        # 🗺️ [업그레이드된 지도 기능]
+        # ---------------------------------------------------------
         map_data = df.dropna(subset=['lat', 'lon'])
 
         if not map_data.empty:
-            st.subheader(f"🗺️ 글로벌 프로젝트 지도 ({len(map_data)}개 위치)")
-            # 스트림릿 내장 지도 기능 (lat, lon 컬럼을 자동으로 인식함)
-            st.map(map_data, zoom=1)
-        # ---------------------------------------------------------
+            st.subheader(f"🗺️ 글로벌 프로젝트 지도 ({len(map_data)}개)")
+            
+            # 지도 설정 (초기 위치 및 줌)
+            view_state = pdk.ViewState(
+                latitude=map_data['lat'].mean(),
+                longitude=map_data['lon'].mean(),
+                zoom=2,
+                pitch=0,
+            )
 
-        st.divider() # 구분선
+            # 레이어 설정 (빨간 점 표시 및 툴팁 데이터 연결)
+            layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=map_data,
+                get_position='[lon, lat]',
+                get_color='[255, 0, 0, 160]',  # 빨간색 (RGB + 투명도)
+                get_radius=200000,             # 점 크기 (미터 단위, 200km 반경)
+                pickable=True,                 # 마우스 선택 가능 여부 (필수!)
+                auto_highlight=True,
+            )
+
+            # 지도 그리기 (툴팁 설정 포함)
+            st.pydeck_chart(pdk.Deck(
+                map_style=None,
+                initial_view_state=view_state,
+                layers=[layer],
+                tooltip={
+                    "html": "<b>프로젝트:</b> {project_name}<br/>"
+                            "<b>위치:</b> {location}<br/>"
+                            "<b>용량:</b> {power_capacity_mw} MW<br/>"
+                            "<b>기술:</b> {energy_tech}",
+                    "style": {
+                        "backgroundColor": "steelblue",
+                        "color": "white"
+                    }
+                }
+            ))
+        # ---------------------------------------------------------
 
         st.metric("총 수집 프로젝트", f"{len(df)}건")
 
-        # 리스트/표 보기 모드
+        # 보기 설정
         st.sidebar.header("📱 보기 설정")
         view_mode = st.sidebar.radio("방식 선택", ["표로 보기 (PC)", "리스트 (모바일)"])
 
@@ -55,12 +89,11 @@ try:
                     "url": st.column_config.LinkColumn("기사", display_text="🔗"),
                     "title": st.column_config.Column("뉴스 제목", width="large"),
                     "created_at": "수집일시",
-                    "lat": None, # 표에서는 위도/경도 숫자를 숨김 (지저분하니까)
+                    "lat": None, 
                     "lon": None
                 }
             )
         else:
-            # 모바일 리스트 뷰
             for index, row in df.iterrows():
                 with st.container():
                     st.markdown(f"### [{row['title']}]({row['url']})")
