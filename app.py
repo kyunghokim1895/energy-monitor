@@ -2,6 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 import re
+import html  # 특수문자 변환을 위해 추가
 
 st.set_page_config(page_title="에너지 모니터링", layout="wide")
 
@@ -17,20 +18,27 @@ try:
     if response.data:
         df = pd.DataFrame(response.data)
         
-        # 4번 해결: 인덱스를 1번부터 시작하도록 설정
+        # 4번 해결: 인덱스를 1번부터 시작
         df.index = range(1, len(df) + 1)
         
-        # 제목의 <b> 태그 등 HTML 태그 제거 (정규표현식 사용)
-        df['title'] = df['title'].apply(lambda x: re.sub(r'<[^>]*>', '', x) if x else x)
+        # 3번 해결: HTML 태그 제거 및 &quot; 같은 특수문자 복원
+        def clean_text(text):
+            if not text: return text
+            # 1. <b> 태그 등 제거
+            text = re.sub(r'<[^>]*>', '', text)
+            # 2. &quot; -> " 등 특수기호 변환
+            text = html.unescape(text)
+            return text
+
+        df['title'] = df['title'].apply(clean_text)
 
         st.metric("총 수집 프로젝트", f"{len(df)}건")
 
-        # 3번 해결: height를 None으로 설정하거나 큰 값을 주어 스크롤 없이 다 보이게 함
-        # (기본적으로 st.dataframe은 높이가 고정되므로 height 파라미터를 조정합니다)
+        # 1번 해결: height=None으로 설정하면 데이터 개수에 딱 맞게 표가 끝납니다.
         st.dataframe(
             df.drop(columns=['id']), 
             use_container_width=True,
-            height=2000, # 충분히 크게 설정하여 모든 기사가 한 번에 보이게 함
+            height=None, 
             column_config={
                 "url": st.column_config.LinkColumn("기사", display_text="🔗"),
                 "title": st.column_config.Column("뉴스 제목", width="large"),
