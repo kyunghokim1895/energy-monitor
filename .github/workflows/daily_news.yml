@@ -2,9 +2,8 @@ name: Daily Energy News Collect
 
 on:
   schedule:
-    # 8시 30분 (한국 시간은 UTC+9 이므로, UTC 23시 30분으로 설정)
     - cron: '30 23 * * *'
-  workflow_dispatch: # 수동으로 실행해볼 수 있는 버튼 생성
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -16,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python_version: '3.11'
+          python-version: '3.11' # 언더바(_)를 하이픈(-)으로 수정했습니다.
 
       - name: Install dependencies
         run: |
