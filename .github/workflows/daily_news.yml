@@ -15,11 +15,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11' # 언더바(_)를 하이픈(-)으로 수정했습니다.
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
-          pip install requests beautifulsoup4 openai python-dotenv supabase
+          pip install requests beautifulsoup4 openai python-dotenv supabase feedparser
 
       - name: Run scraper
         env:
