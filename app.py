@@ -34,11 +34,11 @@ try:
 
         st.metric("총 수집 프로젝트", f"{len(df)}건")
 
-        # 1번 해결: height=None으로 설정하면 데이터 개수에 딱 맞게 표가 끝납니다.
+        # 1번 해결: height='content'로 설정하면 데이터 개수에 딱 맞게 표가 끝납니다.
         st.dataframe(
             df.drop(columns=['id']), 
             use_container_width=True,
-            height=None, 
+            height='content',  # None 대신 'content'를 사용합니다.
             column_config={
                 "url": st.column_config.LinkColumn("기사", display_text="🔗"),
                 "title": st.column_config.Column("뉴스 제목", width="large"),
