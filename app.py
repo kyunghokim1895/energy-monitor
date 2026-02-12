@@ -19,26 +19,27 @@ try:
     response = supabase.table("projects").select("*").order("created_at", desc=True).execute()
     
     if response.data:
-        df = pd.DataFrame(response.data)
+        all_df = pd.DataFrame(response.data)
         
-        # 날짜 및 데이터 정리
-        df['created_at_dt'] = pd.to_datetime(df['created_at']).dt.tz_localize(None)
-        df['display_date'] = df['created_at_dt'].dt.strftime('%Y-%m-%d')
+        # 시간대 제거 및 날짜 정리
+        all_df['created_at_dt'] = pd.to_datetime(all_df['created_at']).dt.tz_localize(None)
+        all_df['display_date'] = all_df['created_at_dt'].dt.strftime('%Y-%m-%d')
         
-        # 필터 설정
+        # 1. 사이드바 필터 설정
         st.sidebar.header("🔍 필터 설정")
         period = st.sidebar.radio("조회 기간", ["최근 1개월", "최근 3개월", "전체 보기"], index=0)
+        
         now = datetime.now()
+        df = all_df.copy() # 화면 표시용 데이터
+        
         if period == "최근 1개월":
-            limit_date = now - timedelta(days=30)
-            df = df[df['created_at_dt'] >= limit_date]
+            df = df[df['created_at_dt'] >= (now - timedelta(days=30))]
         elif period == "최근 3개월":
-            limit_date = now - timedelta(days=90)
-            df = df[df['created_at_dt'] >= limit_date]
-            
-        # 순서 컬럼 생성 및 정리
+            df = df[df['created_at_dt'] >= (now - timedelta(days=90))]
+
+        # 데이터 정리 (No.를 텍스트로 변환하여 가운데 정렬 유도)
         df = df.reset_index(drop=True)
-        df['No.'] = df.index + 1
+        df['No.'] = (df.index + 1).astype(str) # 숫자를 문자로 바꿔서 정렬 이슈 해결 시도
         
         def clean_text(text):
             if not text: return text
@@ -47,47 +48,62 @@ try:
         df['title'] = df['title'].apply(clean_text)
 
         # ---------------------------------------------------------
-        # 🗺️ 지도 시각화 (말풍선 배경색을 부드러운 파란색으로 변경)
+        # 🗺️ 지도 시각화 (사라짐 방지를 위해 all_df 기준 또는 필터 체크)
         # ---------------------------------------------------------
-        map_data = df.dropna(subset=['lat', 'lon'])
+        # 좌표가 있는 모든 데이터를 사용하거나, 필터링된 데이터 중 좌표 있는 것 선택
+        map_data = df.dropna(subset=['lat', 'lon']).copy()
+
         if not map_data.empty:
             st.subheader(f"🗺️ 글로벌 프로젝트 지도 ({len(map_data)}건)")
-            st.caption("🔴 500MW 이상 | 🟠 100MW 이상 | 🟢 100MW 미만/미상")
             
-            # (중략: MW 및 색상 처리 로직은 동일)
+            # MW 색상 로직
+            def parse_mw(val):
+                nums = re.findall(r'\d+', str(val))
+                return float(nums[0]) if nums else 0
+            map_data['mw_num'] = map_data['power_capacity_mw'].apply(parse_mw)
+            map_data['color'] = map_data['mw_num'].apply(lambda x: [200, 30, 30, 230] if x >= 500 else ([255, 140, 0, 230] if x >= 100 else [0, 150, 0, 230]))
 
-            view_state = pdk.ViewState(latitude=map_data['lat'].mean(), longitude=map_data['lon'].mean(), zoom=1)
-            layer = pdk.Layer("ScatterplotLayer", data=map_data, get_position='[lon, lat]', get_fill_color='color', get_radius=200000, pickable=True, auto_highlight=True)
+            view_state = pdk.ViewState(
+                latitude=map_data['lat'].mean(), 
+                longitude=map_data['lon'].mean(), 
+                zoom=1
+            )
+            
+            layer = pdk.Layer(
+                "ScatterplotLayer", 
+                data=map_data, 
+                get_position='[lon, lat]', 
+                get_fill_color='color', 
+                get_radius=250000, # 점 크기 살짝 키움
+                pickable=True, 
+                auto_highlight=True
+            )
 
             st.pydeck_chart(pdk.Deck(
                 initial_view_state=view_state,
                 layers=[layer],
                 tooltip={
                     "html": """
-                    <div style="font-family: sans-serif; padding: 10px;">
+                    <div style="font-family: sans-serif; padding: 10px; background-color: #A0C4FF; border-radius: 8px;">
                         <b style="font-size: 15px; color: #1E1E1E;">{project_name}</b><br/>
                         <hr style="margin: 5px 0; border: 0.5px solid #555;">
                         <span style="color: #2D3436;">📍 <b>위치:</b> {location}</span><br/>
                         <span style="color: #2D3436;">⚡ <b>용량:</b> {power_capacity_mw} MW</span>
                     </div>
                     """,
-                    "style": {
-                        "backgroundColor": "#A0C4FF",  # 이미지의 글자색과 유사한 부드러운 파란색
-                        "color": "#1E1E1E",           # 가독성을 위해 글자는 어두운 회색
-                        "border": "1px solid #74b9ff",
-                        "borderRadius": "8px",
-                        "zIndex": "10000"
-                    }
+                    "style": {"backgroundColor": "transparent", "color": "transparent", "border": "none"}
                 }
             ))
+        else:
+            st.info("현재 필터 범위 내에 지도에 표시할 좌표 데이터가 없습니다. '전체 보기'를 선택해 보세요.")
 
         st.divider()
         st.metric("조회된 프로젝트", f"{len(df)}건 ({period})")
 
+        # --- 목록 보기 방식 ---
         view_mode = st.sidebar.radio("목록 보기 방식", ["표 (PC)", "리스트 (모바일)"])
 
         if view_mode == "표 (PC)":
-            # 불필요한 인덱스 숨기기 및 표 출력
             st.dataframe(
                 df[['No.', 'title', 'url', 'project_name', 'location', 'power_capacity_mw', 'energy_tech', 'display_date']],
                 use_container_width=True,
@@ -97,7 +113,6 @@ try:
                     "No.": st.column_config.Column("No.", width="small"),
                     "url": st.column_config.LinkColumn("기사", display_text="🔗 이동"),
                     "title": st.column_config.Column("뉴스 제목", width="large"),
-                    "display_date": "수집일"
                 }
             )
         else:
@@ -112,9 +127,8 @@ try:
                     c3.caption("📅 날짜")
                     c3.write(row['display_date'])
                     st.divider()
-
     else:
-        st.info("데이터가 없습니다.")
+        st.warning("데이터베이스가 비어 있습니다.")
 
 except Exception as e:
     st.error(f"오류 발생: {e}")
