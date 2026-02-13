@@ -49,27 +49,28 @@ def scrape_article(url):
     except Exception as e:
         return ""
 
-# main.py의 analyze_ai 함수 내부 프롬프트만 수정
+# main.py의 analyze_ai 함수 내부 프롬프트만 아래로 교체하세요.
+
 def analyze_ai(text):
-    # 좌표 추출을 더 강력하게 요청하도록 프롬프트를 수정합니다.
+    # 좌표 추출을 유지하고, 위치 정보의 출력 형식을 단순 문자열로 엄격하게 지정합니다.
     prompt = """
     Analyze the text as an energy analyst. Extract info in JSON format.
     Keep original language for text fields.
-    Fields: 
-    - project_name
-    - location (City, State/Country)
-    - lat (Approximate latitude of the location, float) <-- 좌표 추출에 집중
-    - lon (Approximate longitude of the location, float) <-- 좌표 추출에 집중
-    - power_capacity_mw
-    - energy_tech
-    - pue_target
-    - companies
     
-    If location is not a clear geographic place (like Moon), set lat/lon to null.
-    If info is missing, use null.
+    Fields: 
+    - project_name (String)
+    - location (String - e.g., "North Carolina" or "Seoul, Korea")
+    - lat (Approximate latitude, float)
+    - lon (Approximate longitude, float)
+    - power_capacity_mw (String or Number)
+    - energy_tech (String)
+    - pue_target (String or Number)
+    - companies (String)
+    
+    If location is not a clear geographic place, set lat/lon to null and location to null.
+    Do not output nested JSON structures for location or any other field. Output ONLY a flat JSON object.
     """
     try:
-        # ... (나머지 코드는 동일)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "system", "content": prompt}, {"role": "user", "content": text}],
