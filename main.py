@@ -55,8 +55,10 @@ def scrape_article(url):
 
 # main.py 파일의 analyze_ai 함수 내부 프롬프트만 아래로 교체하세요.
 
+# main.py 파일의 analyze_ai 함수만 아래 코드로 교체하세요.
+
 def analyze_ai(text):
-    # 위치 필드에 대한 형식을 더욱 엄격하게 지정합니다.
+    # 좌표 추출을 가장 강력하게 요구하는 프롬프트 버전
     prompt = """
     Analyze the text as an energy analyst. Extract info in JSON format.
     Keep original language for text fields.
@@ -64,16 +66,16 @@ def analyze_ai(text):
     Fields: 
     - project_name (String)
     - location (String - Must be a flat string like "North Carolina" or "Seoul, Korea") 
-    - lat (Approximate latitude, float)
-    - lon (Approximate longitude, float)
+    - lat (Approximate latitude, float) <-- ***좌표가 있으면 반드시 채워넣을 것***
+    - lon (Approximate longitude, float) <-- ***좌표가 있으면 반드시 채워넣을 것***
     - power_capacity_mw (String or Number)
     - energy_tech (String)
     - pue_target (String or Number)
     - companies (String)
     
     CRITICAL INSTRUCTION:
-    DO NOT output nested JSON structures for the 'location' field. 
-    The 'location' field MUST be a single, flat string.
+    If a location is specified (e.g., "Seoul", "North Carolina"), you MUST try to find its approximate latitude and longitude (lat/lon) and output them as floats.
+    The location field MUST be a single, flat string.
     The ENTIRE output must be a single, flat JSON object.
     """
     try:
