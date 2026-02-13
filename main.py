@@ -94,15 +94,40 @@ def process_and_save(title, link):
         
         if len(body) > 100:
             analysis = analyze_ai(body)
+            i# main.py 파일의 process_and_save 함수 내 삽입 부분만 수정
             if analysis:
-                # 리스트 -> 문자열 변환
+                # 1. 리스트 -> 문자열 변환 (기존 코드)
                 for k in analysis:
-                    if isinstance(analysis[k], list): analysis[k] = ", ".join(map(str, analysis[k]))
+                    if isinstance(analysis[k], list): 
+                        analysis[k] = ", ".join(map(str, analysis[k]))
+                
+                # 2. ⭐ [새로 추가] 위치 정보(location)가 JSON 문자열 형태일 경우, 순수 문자열로 변환
+                if isinstance(analysis.get('location'), str) and (analysis['location'].startswith('{') or analysis['location'].startswith('[')):
+                    try:
+                        # 문자열을 파싱하여 City/State/Country 값을 추출 시도
+                        loc_data = json.loads(analysis['location'])
+                        if isinstance(loc_data, dict):
+                            # "서울", "대한민국" 처럼 깔끔한 형태를 선호
+                            city = loc_data.get('City', '').replace('"', '').replace("'", '').strip()
+                            country = loc_data.get('State/Country', '').replace('"', '').replace("'", '').strip()
+                            
+                            if city and country:
+                                analysis['location'] = f"{city}, {country}"
+                            elif city:
+                                analysis['location'] = city
+                            elif country:
+                                analysis['location'] = country
+                            else:
+                                analysis['location'] = "Location Text Detected" # 복잡한 경우 임시 이름
+                        
+                    except json.JSONDecodeError:
+                        # JSON 파싱 자체가 안 되는 경우 (단순 텍스트로 남김)
+                        pass 
                 
                 # 데이터 삽입
                 analysis.update({"title": title, "url": link})
                 supabase.table("projects").insert(analysis).execute()
-                print(f"✅ 저장 완료!")
+                print(f"✅ 저장 완료: {analysis.get('project_name')}")
         else:
             print(f"⚠️ 스킵: 본문 추출 실패 또는 짧음")
 
