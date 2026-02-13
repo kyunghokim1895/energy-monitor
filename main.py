@@ -51,15 +51,17 @@ def scrape_article(url):
 
 # main.py의 analyze_ai 함수 내부 프롬프트만 아래로 교체하세요.
 
+# main.py 파일의 analyze_ai 함수만 아래 코드로 교체하세요.
+
 def analyze_ai(text):
-    # 좌표 추출을 유지하고, 위치 정보의 출력 형식을 단순 문자열로 엄격하게 지정합니다.
+    # 최후의 보루: AI에게 JSON 형식을 강력하게 강제합니다.
     prompt = """
     Analyze the text as an energy analyst. Extract info in JSON format.
     Keep original language for text fields.
     
     Fields: 
     - project_name (String)
-    - location (String - e.g., "North Carolina" or "Seoul, Korea")
+    - location (String - Must be a flat string like "North Carolina" or "Seoul, Korea")
     - lat (Approximate latitude, float)
     - lon (Approximate longitude, float)
     - power_capacity_mw (String or Number)
@@ -67,8 +69,9 @@ def analyze_ai(text):
     - pue_target (String or Number)
     - companies (String)
     
-    If location is not a clear geographic place, set lat/lon to null and location to null.
-    Do not output nested JSON structures for location or any other field. Output ONLY a flat JSON object.
+    CRITICAL INSTRUCTION:
+    Do not output nested JSON structures for location or any other field. 
+    The entire output must be a single, flat JSON object.
     """
     try:
         response = client.chat.completions.create(
