@@ -86,7 +86,7 @@ def analyze_ai(text):
     except: return None
 
 def process_and_save(title, link):
-    # 중복 체크 (Supabase)
+    # 중복 체크
     check = supabase.table("projects").select("id").eq("url", link).execute()
     if not check.data:
         print(f"🔍 분석 시도: {title[:30]}...")
@@ -94,35 +94,35 @@ def process_and_save(title, link):
         
         if len(body) > 100:
             analysis = analyze_ai(body)
-            i# main.py 파일의 process_and_save 함수 내 삽입 부분만 수정
+            
             if analysis:
-                # 1. 리스트 -> 문자열 변환 (기존 코드)
+                # 1. 모든 리스트 형태를 문자열로 변환 (기존 코드)
                 for k in analysis:
                     if isinstance(analysis[k], list): 
                         analysis[k] = ", ".join(map(str, analysis[k]))
                 
-                # 2. ⭐ [새로 추가] 위치 정보(location)가 JSON 문자열 형태일 경우, 순수 문자열로 변환
-                if isinstance(analysis.get('location'), str) and (analysis['location'].startswith('{') or analysis['location'].startswith('[')):
+                # 2. ⭐ [최후의 보루] location 필드를 강제로 평탄화
+                loc_value = analysis.get('location')
+                if isinstance(loc_value, str) and loc_value.startswith('{'):
                     try:
-                        # 문자열을 파싱하여 City/State/Country 값을 추출 시도
-                        loc_data = json.loads(analysis['location'])
-                        if isinstance(loc_data, dict):
-                            # "서울", "대한민국" 처럼 깔끔한 형태를 선호
-                            city = loc_data.get('City', '').replace('"', '').replace("'", '').strip()
-                            country = loc_data.get('State/Country', '').replace('"', '').replace("'", '').strip()
-                            
-                            if city and country:
-                                analysis['location'] = f"{city}, {country}"
-                            elif city:
-                                analysis['location'] = city
-                            elif country:
-                                analysis['location'] = country
-                            else:
-                                analysis['location'] = "Location Text Detected" # 복잡한 경우 임시 이름
+                        # {"City":"서울","State/Country":"대한민국"} 형태의 문자열을 파싱 시도
+                        loc_data = json.loads(loc_value.replace("'", "\"")) # 작은따옴표를 큰따옴표로 변환 후 파싱
                         
+                        city = loc_data.get('City', '').replace('"', '').strip()
+                        country = loc_data.get('State/Country', '').replace('"', '').strip()
+                        
+                        if city and country and city != 'null':
+                            analysis['location'] = f"{city}, {country}"
+                        elif city and city != 'null':
+                            analysis['location'] = city
+                        elif country and country != 'null':
+                            analysis['location'] = country
+                        else:
+                            analysis['location'] = "Location Detected (Complex)"
+
                     except json.JSONDecodeError:
-                        # JSON 파싱 자체가 안 되는 경우 (단순 텍스트로 남김)
-                        pass 
+                        # 파싱 실패 시 (단순 텍스트이거나 잘못된 JSON)
+                        analysis['location'] = str(loc_value).replace('"', '').replace("'", '').strip()
                 
                 # 데이터 삽입
                 analysis.update({"title": title, "url": link})
@@ -130,6 +130,8 @@ def process_and_save(title, link):
                 print(f"✅ 저장 완료: {analysis.get('project_name')}")
         else:
             print(f"⚠️ 스킵: 본문 추출 실패 또는 짧음")
+
+# ... (나머지 함수는 그대로)
 
 def main():
     print("🚀 [1/2] 네이버 뉴스 검색 수집 시작...")
