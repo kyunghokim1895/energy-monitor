@@ -2,27 +2,32 @@ name: Daily Energy News Collect
 
 on:
   schedule:
-    - cron: '30 23 * * *'  # <-- 한국 시간 아침 8시 30분 (UTC 23:30)
-  # workflow_dispatch:  # <-- 수동 실행 버튼은 남겨두는 것이 좋습니다.
-  workflow_dispatch: 
+    - cron: '30 23 * * *'  # 한국 시간 아침 8시 30분 (UTC 23:30) — 일일 수집
+    - cron: '0 0 1 * *'    # 매월 1일 UTC 00:00 — 60일 비활성화 방지용 keepalive
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
+        if: github.event.schedule != '0 0 1 * *'
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
       - name: Install dependencies
+        if: github.event.schedule != '0 0 1 * *'
         run: |
           pip install requests beautifulsoup4 openai python-dotenv supabase feedparser
 
       - name: Run scraper
+        if: github.event.schedule != '0 0 1 * *'
         env:
           NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
           NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
@@ -30,3 +35,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python main.py
+
+      - name: Keepalive empty commit
+        if: github.event.schedule == '0 0 1 * *'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive (reset 60-day inactivity timer) [skip ci]"
+          git push
